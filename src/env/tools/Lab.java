@@ -284,7 +284,7 @@ public class Lab extends LearningEnvironment {
 
       try {
         a.getRequest().execute();
-        LOGGER.info(a.getRequest().toString());
+        // LOGGER.info(a.getRequest().toString());
       } catch (IOException e) {
         LOGGER.severe(e.getMessage());
       }

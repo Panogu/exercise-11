@@ -3,8 +3,6 @@ package tools;
 import java.util.*;
 import java.util.logging.*;
 
-import javax.swing.Action;
-
 import cartago.Artifact;
 import cartago.OPERATION;
 import cartago.OpFeedbackParam;
@@ -82,6 +80,8 @@ public class QLearner extends Artifact {
     
     // Q-Learning episodes
     for (int episode = 0; episode < episodes; episode++) {
+
+      LOGGER.info("Starting episode " + (episode + 1) + "/" + episodes);
       
       // Randomize initial state by performing random actions
       randomizeEnvironment(random, 5); // Perform 5 random actions to randomize state
@@ -367,6 +367,17 @@ public class QLearner extends Artifact {
       }
       System.out.println();
     }
+
+    // Print qTable to the logger
+    StringBuilder sb = new StringBuilder("Q matrix:\n");
+    for (int i = 0; i < qTable.length; i++) {
+      sb.append("From state ").append(i).append(":  ");
+      for (int j = 0; j < qTable[i].length; j++) {
+        sb.append(String.format("%6.2f ", qTable[i][j]));
+      }
+      sb.append("\n");
+    }
+    LOGGER.info(sb.toString());
   }
 
   /**
