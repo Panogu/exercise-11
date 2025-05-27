@@ -4,6 +4,13 @@
 learning_lab_environment("https://raw.githubusercontent.com/Interactions-HSG/example-tds/was/tds/interactions-lab.ttl").
 task_requirements([2,3]).
 
+// Q-learning parameters (can be modified for experimentation)
+learning_episodes(1000).
+learning_rate(0.1).
+discount_factor(0.9).
+exploration_rate(0.1).
+goal_reward(100).
+
 /* Initial goals */
 !start.
 
@@ -21,6 +28,25 @@ task_requirements([2,3]).
   
   /* Create the ThingArtifact for lab interaction */
   makeArtifact("lab", "org.hyperagents.jacamo.artifacts.wot.ThingArtifact", [Url], LabArtId);
+  
+  // Task 2.2: Use calculateQ to train the Q-learning model for our goal
+  .print("Starting Q-learning for goal [", Z1Level, ",", Z2Level, "]");
+  .print("Parameters: Episodes=", Episodes, ", Alpha=", Alpha, ", Gamma=", Gamma, ", Epsilon=", Epsilon, ", Reward=", Reward);
+  
+  // Calculate Q-table for our goal
+  calculateQ([Z1Level, Z2Level], Episodes, Alpha, Gamma, Epsilon, Reward);
+  .print("Q-learning completed!");
+  
+  // You can also train for other goals if needed
+  // For example, train for all possible goal combinations:
+  /*
+  for ( .range(I, 0, 3) ) {
+    for ( .range(J, 0, 3) ) {
+      .print("Training for goal [", I, ",", J, "]");
+      calculateQ([I, J], Episodes, Alpha, Gamma, Epsilon, Reward);
+    }
+  }
+  */
   
   .print("=== Starting Q-Learning Training ===");
   
