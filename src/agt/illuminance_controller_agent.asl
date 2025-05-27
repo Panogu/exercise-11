@@ -17,6 +17,13 @@ learning_lab_environment("https://raw.githubusercontent.com/Interactions-HSG/exa
 // level of Rank 3. Modify the belief so that the agent can learn to handle different goals.
 task_requirements([2,3]).
 
+// Q-learning parameters (can be modified for experimentation)
+learning_episodes(1000).
+learning_rate(0.1).
+discount_factor(0.9).
+exploration_rate(0.1).
+goal_reward(100).
+
 /* Initial goals */
 !start. // the agent has the goal to start
 
@@ -30,7 +37,12 @@ task_requirements([2,3]).
 */
 @start
 +!start : learning_lab_environment(Url) 
-  & task_requirements([Z1Level, Z2Level]) <-
+  & task_requirements([Z1Level, Z2Level])
+  & learning_episodes(Episodes)
+  & learning_rate(Alpha)
+  & discount_factor(Gamma)
+  & exploration_rate(Epsilon)
+  & goal_reward(Reward) <-
 
   .print("Hello world");
   .print("I want to achieve Z1Level=", Z1Level, " and Z2Level=",Z2Level);
@@ -40,6 +52,25 @@ task_requirements([2,3]).
 
   // creates a ThingArtifact artifact for reading and acting on the state of the lab Thing
   makeArtifact("lab", "org.hyperagents.jacamo.artifacts.wot.ThingArtifact", [Url], LabArtId);
+  
+  // Task 2.2: Use calculateQ to train the Q-learning model for our goal
+  .print("Starting Q-learning for goal [", Z1Level, ",", Z2Level, "]");
+  .print("Parameters: Episodes=", Episodes, ", Alpha=", Alpha, ", Gamma=", Gamma, ", Epsilon=", Epsilon, ", Reward=", Reward);
+  
+  // Calculate Q-table for our goal
+  calculateQ([Z1Level, Z2Level], Episodes, Alpha, Gamma, Epsilon, Reward);
+  .print("Q-learning completed!");
+  
+  // You can also train for other goals if needed
+  // For example, train for all possible goal combinations:
+  /*
+  for ( .range(I, 0, 3) ) {
+    for ( .range(J, 0, 3) ) {
+      .print("Training for goal [", I, ",", J, "]");
+      calculateQ([I, J], Episodes, Alpha, Gamma, Epsilon, Reward);
+    }
+  }
+  */
   
   // example use of the getActionFromState operation of the QLearner artifact
   // relevant for Task 2.3

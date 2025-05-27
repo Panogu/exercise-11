@@ -164,10 +164,62 @@ public class QLearner extends Artifact {
       // Store the Q-table for this goal
       qTables.put(goalKey.hashCode(), qTable);
       
-      LOGGER.info("Q-learning completed for goal " + goalKey);
+      // Display Q-learning summary
+      LOGGER.info("========== Q-LEARNING SUMMARY ==========");
+      LOGGER.info("Goal: " + goalKey);
+      LOGGER.info("Episodes: " + episodes);
+      LOGGER.info("Parameters: alpha=" + alpha + ", gamma=" + gamma + ", epsilon=" + epsilon + ", reward=" + reward);
+      LOGGER.info("Goal states found: " + goalStates.size() + " states");
       
-      // Optionally print the Q-table
-      if (episodes <= 1000) { // Only print for small runs
+      // Calculate statistics about the Q-table
+      int nonZeroEntries = 0;
+      double maxQValue = Double.NEGATIVE_INFINITY;
+      double minQValue = Double.POSITIVE_INFINITY;
+      int statesWithActions = 0;
+      
+      for (int s = 0; s < stateCount; s++) {
+          boolean hasAction = false;
+          for (int a = 0; a < actionCount; a++) {
+              if (qTable[s][a] != 0.0) {
+                  nonZeroEntries++;
+                  hasAction = true;
+                  maxQValue = Math.max(maxQValue, qTable[s][a]);
+                  minQValue = Math.min(minQValue, qTable[s][a]);
+              }
+          }
+          if (hasAction) statesWithActions++;
+      }
+      
+      LOGGER.info("Q-table statistics:");
+      LOGGER.info("  - States with learned actions: " + statesWithActions + "/" + stateCount);
+      LOGGER.info("  - Non-zero Q-values: " + nonZeroEntries + "/" + (stateCount * actionCount));
+      LOGGER.info("  - Max Q-value: " + String.format("%.2f", maxQValue));
+      LOGGER.info("  - Min Q-value: " + String.format("%.2f", minQValue));
+      
+      // Show best actions for goal states
+      LOGGER.info("Best actions for goal states:");
+      for (int goalState : goalStates) {
+          List<Integer> actions = lab.getApplicableActions(goalState);
+          if (!actions.isEmpty()) {
+              int bestAction = actions.get(0);
+              double bestQ = qTable[goalState][bestAction];
+              for (int action : actions) {
+                  if (qTable[goalState][action] > bestQ) {
+                      bestQ = qTable[goalState][action];
+                      bestAction = action;
+                  }
+              }
+              if (bestQ > 0) {
+                  LOGGER.info("  - State " + goalState + ": Action " + bestAction + 
+                            " (Q=" + String.format("%.2f", bestQ) + ")");
+              }
+          }
+      }
+      
+      LOGGER.info("========================================");
+      
+      // Optionally print the full Q-table for small runs
+      if (episodes <= 100) { // Only print for very small runs
           printQTable(qTable);
       }
   }
