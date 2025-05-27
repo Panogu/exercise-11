@@ -171,35 +171,69 @@ public class Lab extends LearningEnvironment {
       }
     }
 
-    /**
-    * @see {@link LearningEnvironment#getCompatibleStates(List)}
-    */
-    @Override
-    public List<Integer> getCompatibleStates(List<Object> stateDescription) {
-
-      List<Integer> compatibleStates = new ArrayList<>();
-      List<List<Integer>> stateList = new ArrayList<>(stateSpace);
-
-      for (int i=0; i<stateList.size(); i++) {
-        List<Integer> state = stateList.get(i);
-
-        List<Object> substates = new ArrayList<>();
-
-        substates.add(Lab.z1Level.get(state.get(0)));
-        substates.add(Lab.z2Level.get(state.get(1)));
-        substates.add(Lab.z1Light.get(state.get(2)));
-        substates.add(Lab.z2Light.get(state.get(3)));
-        substates.add(Lab.z1Blinds.get(state.get(4)));
-        substates.add(Lab.z2Blinds.get(state.get(5)));
-        substates.add(Lab.sunshine.get(state.get(6)));
-
-        if (Collections.indexOfSubList(substates, stateDescription) != -1){
-          compatibleStates.add(i);
-          System.out.println(state);
-        };
+/**
+ * Fixed version of getCompatibleStates - handles type conversion properly
+ */
+@Override
+public List<Integer> getCompatibleStates(List<Object> stateDescription) {
+  List<Integer> compatibleStates = new ArrayList<>();
+  List<List<Integer>> stateList = new ArrayList<>(stateSpace);
+  
+  LOGGER.info("Finding compatible states for " + stateDescription);
+  
+  // Convert stateDescription to proper Integer types
+  List<Integer> targetGoal = new ArrayList<>();
+  for (Object obj : stateDescription) {
+    if (obj instanceof Integer) {
+      targetGoal.add((Integer) obj);
+    } else {
+      // Convert from AgentSpeak types to Integer
+      try {
+        targetGoal.add(Integer.valueOf(obj.toString()));
+      } catch (NumberFormatException e) {
+        LOGGER.warning("Could not parse goal element: " + obj + " (type: " + obj.getClass() + ")");
+        return compatibleStates; // Return empty list on parse error
       }
-      return compatibleStates;
     }
+  }
+  
+  LOGGER.info("Converted target goal to: " + targetGoal + " (types: " + 
+              targetGoal.stream().map(Object::getClass).toArray() + ")");
+  
+  // We expect at least [z1Level, z2Level]
+  if (targetGoal.size() < 2) {
+    LOGGER.warning("Goal must have at least 2 elements [z1Level, z2Level], got: " + targetGoal);
+    return compatibleStates;
+  }
+  
+  int targetZ1 = targetGoal.get(0);
+  int targetZ2 = targetGoal.get(1);
+  
+  LOGGER.info("Looking for states with Z1=" + targetZ1 + " and Z2=" + targetZ2);
+  
+  // Direct comparison approach (much simpler and more reliable)
+  for (int i = 0; i < stateList.size(); i++) {
+    List<Integer> state = stateList.get(i);
+    
+    if (state.size() >= 2) {
+      int stateZ1 = state.get(0);
+      int stateZ2 = state.get(1);
+      
+      // Direct integer comparison - no type issues!
+      if (stateZ1 == targetZ1 && stateZ2 == targetZ2) {
+        compatibleStates.add(i);
+        
+        // Log first few matches for verification
+        if (compatibleStates.size() <= 5) {
+          LOGGER.info("Found compatible state " + i + ": " + state);
+        }
+      }
+    }
+  }
+  
+  LOGGER.info("Found " + compatibleStates.size() + " compatible states for " + targetGoal);
+  return compatibleStates;
+}
 
     /**
     * @see {@link LearningEnvironment#readCurrentState()}

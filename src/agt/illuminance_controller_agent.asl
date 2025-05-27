@@ -1,4 +1,4 @@
-//illuminance controller agent - Task 2 Implementation
+//illuminance controller agent - Clean Version with Q-Table Export
 
 /* Initial beliefs and rules */
 learning_lab_environment("https://raw.githubusercontent.com/Interactions-HSG/example-tds/was/tds/interactions-lab.ttl").
@@ -8,7 +8,7 @@ task_requirements([2,3]).
 !start.
 
 /* 
- * Main startup plan - Task 2.2 Implementation
+ * Main startup plan - Complete Task 2 Implementation
  */
 +!start : learning_lab_environment(Url) 
   & task_requirements([Z1Level, Z2Level]) <-
@@ -16,7 +16,7 @@ task_requirements([2,3]).
   .print("=== Illuminance Controller Agent Starting ===");
   .print("Target: Z1Level=", Z1Level, " Z2Level=", Z2Level);
 
-  /* Create the QLearner artifact - Task 2.2 */
+  /* Create the QLearner artifact */
   makeArtifact("qlearner", "tools.QLearner", [Url], QLArtId);
   
   /* Create the ThingArtifact for lab interaction */
@@ -24,23 +24,74 @@ task_requirements([2,3]).
   
   .print("=== Starting Q-Learning Training ===");
   
-  /* Train Q-Learning for our goal - Task 2.2 */
-  calculateQ([Z1Level, Z2Level], 1000, 0.1, 0.9, 0.1, 1000);
+  /* Train Q-Learning with improved parameters for better exploration */
+  /* Parameters: goal, episodes, alpha, gamma, epsilon, reward */
+  calculateQ([Z1Level, Z2Level], 1000, 0.2, 0.9, 0.3, 1000);
   .print("Primary Q-Learning completed for goal [", Z1Level, ",", Z2Level, "]");
   
-  /* Train for additional goals for robustness */
-  //calculateQ([3, 3], 800, 0.1, 0.9, 0.1, 1000);
-  //calculateQ([1, 1], 800, 0.1, 0.9, 0.1, 1000);
-  //calculateQ([0, 0], 600, 0.15, 0.9, 0.15, 800);
-  .print("Additional Q-Learning training completed");
+  /* Train for additional goals for comparison */
+  //calculateQ([3, 3], 1500, 0.2, 0.9, 0.3, 1000);
+  //.print("Q-Learning completed for goal [3,3]");
   
-  .print("=== Training Complete - Starting Goal Achievement ===");
+  //calculateQ([1, 1], 1500, 0.2, 0.9, 0.3, 1000);
+  //.print("Q-Learning completed for goal [1,1]");
   
-  /* Start acting to achieve the goal - Task 2.3 */
+  calculateQ([0, 0], 1200, 0.25, 0.9, 0.35, 800);
+  .print("Q-Learning completed for goal [0,0]");
+  
+  .print("=== All Q-Learning Training Completed ===");
+  
+  /* Export Q-tables for submission */
+  .print("=== Exporting Q-Tables for Submission ===");
+  exportAllQTables;
+  .print("Q-tables exported to files");
+  
+  /* Print Q-tables to console for report */
+  .print("=== Q-TABLE FOR PRIMARY GOAL [", Z1Level, ",", Z2Level, "] ===");
+  printQTableForReport([Z1Level, Z2Level]);
+  
+  .print("=== Q-TABLE FOR GOAL [3,3] ===");
+  printQTableForReport([3, 3]);
+  
+  .print("=== Q-TABLE FOR GOAL [1,1] ===");
+  printQTableForReport([1, 1]);
+  
+  .print("=== Q-TABLE FOR GOAL [0,0] ===");
+  printQTableForReport([0, 0]);
+  
+  /* Get and display statistics */
+  getQTableStats([Z1Level, Z2Level], PrimaryStats);
+  .print("Statistics for primary goal: ", PrimaryStats);
+  
+  getQTableStats([3, 3], Stats33);
+  .print("Statistics for goal [3,3]: ", Stats33);
+  
+  getQTableStats([1, 1], Stats11);
+  .print("Statistics for goal [1,1]: ", Stats11);
+  
+  getQTableStats([0, 0], Stats00);
+  .print("Statistics for goal [0,0]: ", Stats00);
+  
+  .print("=== Training and Export Complete - Starting Goal Achievement ===");
+  
+  /* Show initial state before acting */
+  !get_current_state_info;
+  
+  /* Start acting to achieve the goal */
   !achieve_goal.
 
 /*
- * Main goal achievement plan - Task 2.3 Implementation
+ * Helper plan to get and display current state information
+ */
++!get_current_state_info <-
+  .print("Reading current lab state...");
+  readCurrentLabState(CurrentState);
+  .print("Current state: ", CurrentState);
+  getStateDescription(StateDesc);
+  .print("State description: ", StateDesc).
+
+/*
+ * Main goal achievement plan
  */
 +!achieve_goal : task_requirements([Z1Level, Z2Level]) <-
   .print("Attempting to reach goal [", Z1Level, ",", Z2Level, "]");
@@ -52,11 +103,11 @@ task_requirements([2,3]).
 +!act_towards_goal(Step) : Step < 15 <-
   .print("--- Action Step ", Step, " ---");
   
-  /* Read current state from lab */
-  readProperty("http://example.org/was#Status", CurrentState);
+  /* Read current state using QLearner's capability */
+  readCurrentLabState(CurrentState);
   .print("Current lab state: ", CurrentState);
   
-  /* Get best action using learned Q-table - Task 2.3 */
+  /* Get best action using learned Q-table */
   task_requirements([Z1Level, Z2Level]);
   getActionFromState([Z1Level, Z2Level], CurrentState, ActionTag, PayloadTags, Payload);
   .print("Selected action: ", ActionTag, " with payload: ", Payload);
@@ -77,8 +128,10 @@ task_requirements([2,3]).
  */
 +!act_towards_goal(Step) : Step >= 15 <-
   .print("=== Reached maximum steps (15) ===");
-  readProperty("http://example.org/was#Status", FinalState);
+  readCurrentLabState(FinalState);
   .print("Final achieved state: ", FinalState);
+  getStateDescription(FinalStateDesc);
+  .print("Final state description: ", FinalStateDesc);
   task_requirements([Z1Level, Z2Level]);
   .print("Target was: [Z1Level=", Z1Level, ", Z2Level=", Z2Level, "]");
   .print("=== Goal Achievement Attempt Complete ===").
@@ -88,56 +141,110 @@ task_requirements([2,3]).
  */
 -!achieve_goal <-
   .print("ERROR: Failed to achieve goal");
-  readProperty("http://example.org/was#Status", ErrorState);
+  readCurrentLabState(ErrorState);
   .print("State when error occurred: ", ErrorState).
 
 /*
- * Plan for testing the learned policy manually
+ * Plan for manually exporting Q-tables
+ */
++!export_qtables_manual <-
+  .print("=== Manual Q-Table Export ===");
+  exportAllQTables;
+  task_requirements([Z1, Z2]);
+  exportQTableForGoal([Z1, Z2], "primary_goal_qtable");
+  exportQTableForGoal([3, 3], "max_illuminance_qtable"); 
+  exportQTableForGoal([1, 1], "low_illuminance_qtable");
+  exportQTableForGoal([0, 0], "min_illuminance_qtable");
+  .print("Manual export completed").
+
+/*
+ * Plan for testing the learned policy
  */
 +!test_policy : task_requirements([Z1Level, Z2Level]) <-
   .print("=== Testing Learned Policy ===");
-  readProperty("http://example.org/was#Status", TestState);
+  readCurrentLabState(TestState);
   .print("Current state for testing: ", TestState);
   
   getActionFromState([Z1Level, Z2Level], TestState, TestAction, TestTags, TestPayload);
   .print("Recommended action: ", TestAction, " payload: ", TestPayload);
   
-  .print("Test completed - you can manually invoke: !test_policy").
+  /* Test other goals too */
+  getActionFromState([3, 3], TestState, Action33, Tags33, Payload33);
+  .print("For goal [3,3] would recommend: ", Action33, " payload: ", Payload33);
+  
+  getActionFromState([1, 1], TestState, Action11, Tags11, Payload11);
+  .print("For goal [1,1] would recommend: ", Action11, " payload: ", Payload11);
+  
+  getActionFromState([0, 0], TestState, Action00, Tags00, Payload00);
+  .print("For goal [0,0] would recommend: ", Action00, " payload: ", Payload00);
+  
+  .print("Policy testing completed").
 
 /*
- * Plan for demonstrating different goals
+ * Plan for demonstrating different goals sequentially
  */
-+!demo_different_goals <-
-  .print("=== Demonstrating Different Goals ===");
++!demo_all_goals <-
+  .print("=== Demonstrating All Learned Goals ===");
   
   .print("Testing goal [3,3] - Maximum illuminance");
-  !single_goal_test([3, 3]);
+  !single_goal_demo([3, 3], 8);
   
   .wait(5000);
   
   .print("Testing goal [1,1] - Low illuminance");  
-  !single_goal_test([1, 1]);
+  !single_goal_demo([1, 1], 8);
   
   .wait(5000);
   
   .print("Testing goal [0,0] - Minimal illuminance");
-  !single_goal_test([0, 0]);
+  !single_goal_demo([0, 0], 8);
   
   .print("=== All goal demonstrations complete ===").
 
 /*
- * Helper plan for testing a single goal
+ * Helper plan for demonstrating a single goal
  */
-+!single_goal_test(Goal) <-
-  .print("Testing goal: ", Goal);
-  readProperty("http://example.org/was#Status", State);
++!single_goal_demo(Goal, MaxSteps) <-
+  .print("Demonstrating goal: ", Goal);
+  !demo_goal_steps(Goal, 0, MaxSteps).
+
++!demo_goal_steps(Goal, Step, MaxSteps) : Step < MaxSteps <-
+  .print("Demo step ", Step, " for goal ", Goal);
+  readCurrentLabState(State);
   getActionFromState(Goal, State, Action, Tags, Payload);
-  .print("For goal ", Goal, " recommended action: ", Action, " with payload: ", Payload);
+  .print("Action: ", Action, " with payload: ", Payload);
   
-  /* Execute the action */
   invokeAction(Action, Tags, Payload);
   .wait(2000);
   
-  /* Show result */
-  readProperty("http://example.org/was#Status", NewState);
-  .print("State after action: ", NewState).
+  NextStep = Step + 1;
+  !demo_goal_steps(Goal, NextStep, MaxSteps).
+
++!demo_goal_steps(Goal, Step, MaxSteps) : Step >= MaxSteps <-
+  .print("Demo completed for goal ", Goal);
+  readCurrentLabState(FinalState);
+  getStateDescription(FinalDesc);
+  .print("Final state: ", FinalDesc).
+
+/*
+ * Plan for analyzing Q-table quality
+ */
++!analyze_learning_quality <-
+  .print("=== Q-Table Quality Analysis ===");
+  
+  task_requirements([Z1, Z2]);
+  getQTableStats([Z1, Z2], Stats1);
+  getQTableStats([3, 3], Stats2);
+  getQTableStats([1, 1], Stats3);
+  getQTableStats([0, 0], Stats4);
+  
+  .print("Analysis completed - check statistics above").
+
+/*
+ * Utility plan for quick state check
+ */
++!check_state <-
+  readCurrentLabState(State);
+  getStateDescription(Desc);
+  .print("Quick state check - State: ", State);
+  .print("Description: ", Desc).

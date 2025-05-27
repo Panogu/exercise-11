@@ -1,0 +1,20 @@
+Q-TABLE SUMMARY REPORT
+======================
+
+Generated: Tue May 27 22:49:57 CEST 2025
+Total Q-tables: 2
+
+Goal Hash: -1644042410
+Dimensions: 1024 × 8
+Max Q-value: 260,121393
+Min Q-value: -46,929875
+Avg Q-value: 0,258270
+Learning coverage: 3,9%
+
+Goal Hash: -1642195275
+Dimensions: 1024 × 8
+Max Q-value: 260,729984
+Min Q-value: -48,705169
+Avg Q-value: 0,698191
+Learning coverage: 3,8%
+
