@@ -148,41 +148,216 @@ public class QLearner extends Artifact {
     printQTable(qTable);
   }
 
-/**
-* Returns information about the next best action based on a provided state and the QTable for
-* a goal description. The returned information can be used by agents to invoke an action 
-* using a ThingArtifact.
-*
-* @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
-* @param  currentStateDescription the current state e.g. [2,2,true,false,true,true,2]
-* @param  nextBestActionTag the (returned) semantic annotation of the next best action, e.g. "http://example.org/was#SetZ1Light"
-* @param  nextBestActionPayloadTags the (returned) semantic annotations of the payload of the next best action, e.g. [Z1Light]
-* @param nextBestActionPayload the (returned) payload of the next best action, e.g. true
-**/
+  /**
+  * Returns information about the next best action based on a provided state and the QTable for
+  * a goal description. The returned information can be used by agents to invoke an action 
+  * using a ThingArtifact.
+  *
+  * @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
+  * @param  currentStateDescription the current state e.g. [2,2,true,false,true,true,2]
+  * @param  nextBestActionTag the (returned) semantic annotation of the next best action, e.g. "http://example.org/was#SetZ1Light"
+  * @param  nextBestActionPayloadTags the (returned) semantic annotations of the payload of the next best action, e.g. [Z1Light]
+  * @param nextBestActionPayload the (returned) payload of the next best action, e.g. true
+  **/
   @OPERATION
   public void getActionFromState(Object[] goalDescription, Object[] currentStateDescription,
       OpFeedbackParam<String> nextBestActionTag, OpFeedbackParam<Object[]> nextBestActionPayloadTags,
       OpFeedbackParam<Object[]> nextBestActionPayload) {
-         
-        // remove the following upon implementing Task 2.3!
-
-        // sets the semantic annotation of the next best action to be returned 
-        nextBestActionTag.set("http://example.org/was#SetZ1Light");
-
-        // sets the semantic annotation of the payload of the next best action to be returned 
-        Object payloadTags[] = { "Z1Light" };
-        nextBestActionPayloadTags.set(payloadTags);
-
-        // sets the payload of the next best action to be returned 
-        Object payload[] = { true };
-        nextBestActionPayload.set(payload);
+        
+    try {
+      // Get the Q-table for this goal
+      int goalHash = Arrays.hashCode(goalDescription);
+      double[][] qTable = qTables.get(goalHash);
+      
+      if (qTable == null) {
+        LOGGER.severe("No Q-table found for goal: " + Arrays.toString(goalDescription));
+        LOGGER.severe("Available Q-table hashes: " + qTables.keySet());
+        // Fallback to default action
+        setDefaultAction(nextBestActionTag, nextBestActionPayloadTags, nextBestActionPayload);
+        return;
       }
+      
+      // Convert current state description to state index
+      int currentStateIndex = convertStateDescriptionToIndex(currentStateDescription);
+      
+      if (currentStateIndex == -1) {
+        LOGGER.severe("Could not convert state description to valid state index: " + Arrays.toString(currentStateDescription));
+        setDefaultAction(nextBestActionTag, nextBestActionPayloadTags, nextBestActionPayload);
+        return;
+      }
+      
+      // Get applicable actions for current state
+      List<Integer> applicableActions = lab.getApplicableActions(currentStateIndex);
+      
+      if (applicableActions.isEmpty()) {
+        LOGGER.warning("No applicable actions for state: " + currentStateIndex);
+        setDefaultAction(nextBestActionTag, nextBestActionPayloadTags, nextBestActionPayload);
+        return;
+      }
+      
+      // Find the action with highest Q-value
+      int bestAction = applicableActions.get(0);
+      double maxQValue = qTable[currentStateIndex][bestAction];
+      
+      for (int action : applicableActions) {
+        double qValue = qTable[currentStateIndex][action];
+        if (qValue > maxQValue) {
+          maxQValue = qValue;
+          bestAction = action;
+        }
+      }
+      
+      // Get the action object
+      Action actionObj = lab.getAction(bestAction);
+      
+      if (actionObj == null) {
+        LOGGER.severe("Could not retrieve action object for action index: " + bestAction);
+        setDefaultAction(nextBestActionTag, nextBestActionPayloadTags, nextBestActionPayload);
+        return;
+      }
+      
+      // Set the return values
+      nextBestActionTag.set(actionObj.getActionTag());
+      nextBestActionPayloadTags.set(actionObj.getPayloadTags());
+      nextBestActionPayload.set(actionObj.getPayload());
+      
+      LOGGER.info("Best action for goal " + Arrays.toString(goalDescription) + 
+                  " from state " + Arrays.toString(currentStateDescription) + ": " + 
+                  actionObj.getActionTag() + " with Q-value: " + maxQValue);
+                  
+    } catch (Exception e) {
+      LOGGER.severe("Error in getActionFromState: " + e.getMessage());
+      e.printStackTrace();
+      setDefaultAction(nextBestActionTag, nextBestActionPayloadTags, nextBestActionPayload);
+    }
+  }
 
-    /**
-    * Print the Q matrix
-    *
-    * @param qTable the Q matrix
-    */
+  /**
+   * Converts a state description array to a state index in the state space
+   */
+  private int convertStateDescriptionToIndex(Object[] stateDescription) {
+    try {
+      // The state description can be in two formats:
+      // 1. Raw sensor values: [z1Level_lux, z2Level_lux, z1Light, z2Light, z1Blinds, z2Blinds, sunshine_lux]
+      // 2. Discretized values: [z1Level_rank, z2Level_rank, z1Light_int, z2Light_int, z1Blinds_int, z2Blinds_int, sunshine_rank]
+      
+      List<Integer> discretizedState = new ArrayList<>();
+      
+      if (stateDescription.length >= 7) {
+        // Handle the first format (raw sensor values)
+        if (stateDescription[0] instanceof Double || stateDescription[0] instanceof Float) {
+          // Convert raw values to discretized state
+          discretizedState.add(discretizeLightLevel(((Number) stateDescription[0]).doubleValue()));
+          discretizedState.add(discretizeLightLevel(((Number) stateDescription[1]).doubleValue()));
+          discretizedState.add(((Boolean) stateDescription[2]) ? 1 : 0);
+          discretizedState.add(((Boolean) stateDescription[3]) ? 1 : 0);
+          discretizedState.add(((Boolean) stateDescription[4]) ? 1 : 0);
+          discretizedState.add(((Boolean) stateDescription[5]) ? 1 : 0);
+          discretizedState.add(discretizeSunshine(((Number) stateDescription[6]).doubleValue()));
+        } else {
+          // Handle the second format (already discretized values)
+          for (int i = 0; i < 7 && i < stateDescription.length; i++) {
+            if (stateDescription[i] instanceof Boolean) {
+              discretizedState.add(((Boolean) stateDescription[i]) ? 1 : 0);
+            } else {
+              discretizedState.add(((Number) stateDescription[i]).intValue());
+            }
+          }
+        }
+      } else {
+        LOGGER.severe("State description has insufficient elements: " + stateDescription.length);
+        return -1;
+      }
+      
+      // Find the index of this state in the state space
+      List<List<Integer>> stateList = new ArrayList<>(lab.stateSpace);
+      int stateIndex = stateList.indexOf(discretizedState);
+      
+      if (stateIndex == -1) {
+        LOGGER.warning("State not found in state space: " + discretizedState);
+        LOGGER.warning("Available states count: " + stateList.size());
+        // Try to find a compatible state if exact match fails
+        return findCompatibleState(discretizedState, stateList);
+      }
+      
+      return stateIndex;
+      
+    } catch (Exception e) {
+      LOGGER.severe("Error converting state description: " + e.getMessage());
+      return -1;
+    }
+  }
+
+  /**
+   * Finds a compatible state if exact match is not found
+   */
+  private int findCompatibleState(List<Integer> targetState, List<List<Integer>> stateList) {
+    // Find the first state that matches the most important dimensions (illuminance levels)
+    for (int i = 0; i < stateList.size(); i++) {
+      List<Integer> state = stateList.get(i);
+      if (state.size() >= 2 && targetState.size() >= 2) {
+        if (state.get(0).equals(targetState.get(0)) && state.get(1).equals(targetState.get(1))) {
+          LOGGER.info("Found compatible state at index " + i + ": " + state);
+          return i;
+        }
+      }
+    }
+    
+    // If no compatible state found, return the first state as fallback
+    LOGGER.warning("No compatible state found, using first state as fallback");
+    return 0;
+  }
+
+  /**
+   * Discretizes light level values (same logic as in Lab.java)
+   */
+  private int discretizeLightLevel(double value) {
+    if (value < 50) {
+      return 0;
+    } else if (value < 100) {
+      return 1;
+    } else if (value < 300) {
+      return 2;
+    }
+    return 3;
+  }
+
+  /**
+   * Discretizes sunshine values (same logic as in Lab.java)
+   */
+  private int discretizeSunshine(double value) {
+    if (value < 50) {
+      return 0;
+    } else if (value < 200) {
+      return 1;
+    } else if (value < 700) {
+      return 2;
+    }
+    return 3;
+  }
+
+  /**
+   * Sets a default action when Q-table lookup fails
+   */
+  private void setDefaultAction(OpFeedbackParam<String> nextBestActionTag, 
+                              OpFeedbackParam<Object[]> nextBestActionPayloadTags,
+                              OpFeedbackParam<Object[]> nextBestActionPayload) {
+    
+    LOGGER.info("Using default action");
+    
+    // Default to turning on Z1 light as a safe fallback
+    nextBestActionTag.set("http://example.org/was#SetZ1Light");
+    Object[] payloadTags = { "Z1Light" };
+    nextBestActionPayloadTags.set(payloadTags);
+    Object[] payload = { true };
+    nextBestActionPayload.set(payload);
+  }
+
+  /**
+  * Print the Q matrix
+  *
+  * @param qTable the Q matrix
+  */
   void printQTable(double[][] qTable) {
     System.out.println("Q matrix");
     for (int i = 0; i < qTable.length; i++) {
