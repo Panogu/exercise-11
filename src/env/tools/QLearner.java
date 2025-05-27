@@ -29,39 +29,147 @@ public class QLearner extends Artifact {
     qTables = new HashMap<>();
   }
 
-/**
-* Computes a Q matrix for the state space and action space of the lab, and against
-* a goal description. For example, the goal description can be of the form [z1level, z2Level],
-* where z1Level is the desired value of the light level in Zone 1 of the lab,
-* and z2Level is the desired value of the light level in Zone 2 of the lab.
-* For exercise 11, the possible goal descriptions are:
-* [0,0], [0,1], [0,2], [0,3], 
-* [1,0], [1,1], [1,2], [1,3], 
-* [2,0], [2,1], [2,2], [2,3], 
-* [3,0], [3,1], [3,2], [3,3].
-*
-*<p>
-* HINT: Use the methods of {@link LearningEnvironment} (implemented in {@link Lab})
-* to interact with the learning environment (here, the lab), e.g., to retrieve the
-* applicable actions, perform an action at the lab during learning etc.
-*</p>
-* @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
-* @param  episodesObj the number of episodes used for calculating the Q matrix
-* @param  alphaObj the learning rate with range [0,1].
-* @param  gammaObj the discount factor [0,1]
-* @param epsilonObj the exploration probability [0,1]
-* @param rewardObj the reward assigned when reaching the goal state
-**/
+  /**
+    * Computes a Q matrix for the state space and action space of the lab, and against
+    * a goal description. For example, the goal description can be of the form [z1level, z2Level],
+    * where z1Level is the desired value of the light level in Zone 1 of the lab,
+    * and z2Level is the desired value of the light level in Zone 2 of the lab.
+    * For exercise 11, the possible goal descriptions are:
+    * [0,0], [0,1], [0,2], [0,3], 
+    * [1,0], [1,1], [1,2], [1,3], 
+    * [2,0], [2,1], [2,2], [2,3], 
+    * [3,0], [3,1], [3,2], [3,3].
+    *
+    *<p>
+    * HINT: Use the methods of {@link LearningEnvironment} (implemented in {@link Lab})
+    * to interact with the learning environment (here, the lab), e.g., to retrieve the
+    * applicable actions, perform an action at the lab during learning etc.
+    *</p>
+    * @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
+    * @param  episodesObj the number of episodes used for calculating the Q matrix
+    * @param  alphaObj the learning rate with range [0,1].
+    * @param  gammaObj the discount factor [0,1]
+    * @param epsilonObj the exploration probability [0,1]
+    * @param rewardObj the reward assigned when reaching the goal state
+  **/
   @OPERATION
-  public void calculateQ(Object[] goalDescription , Object episodesObj, Object alphaObj, Object gammaObj, Object epsilonObj, Object rewardObj) {
-    
-    // ensure that the right datatypes are used
-    Integer episodes = Integer.valueOf(episodesObj.toString());
-    Double alpha = Double.valueOf(alphaObj.toString());
-    Double gamma = Double.valueOf(gammaObj.toString());
-    Double epsilon = Double.valueOf(epsilonObj.toString());
-    Integer reward = Integer.valueOf(rewardObj.toString());
-  
+  public void calculateQ(Object[] goalDescription, Object episodesObj, Object alphaObj, Object gammaObj, Object epsilonObj, Object rewardObj) {
+      
+      // ensure that the right datatypes are used
+      Integer episodes = Integer.valueOf(episodesObj.toString());
+      Double alpha = Double.valueOf(alphaObj.toString());
+      Double gamma = Double.valueOf(gammaObj.toString());
+      Double epsilon = Double.valueOf(epsilonObj.toString());
+      Integer reward = Integer.valueOf(rewardObj.toString());
+      
+      // Create a unique key for this goal
+      String goalKey = Arrays.toString(goalDescription);
+      
+      // Initialize Q-table
+      double[][] qTable = initializeQTable();
+      
+      // Get compatible goal states (states where the goal is achieved)
+      List<Object> goalList = Arrays.asList(goalDescription);
+      List<Integer> goalStates = lab.getCompatibleStates(goalList);
+      
+      LOGGER.info("Starting Q-learning for goal " + goalKey + " with " + episodes + " episodes");
+      LOGGER.info("Goal states: " + goalStates);
+      
+      Random random = new Random();
+      
+      // Q-learning algorithm
+      for (int episode = 0; episode < episodes; episode++) {
+          // Randomize initial state by performing random actions
+          for (int i = 0; i < 10; i++) {
+              List<Integer> randomActions = lab.getApplicableActions(lab.readCurrentState());
+              if (!randomActions.isEmpty()) {
+                  int randomAction = randomActions.get(random.nextInt(randomActions.size()));
+                  lab.performAction(randomAction);
+              }
+          }
+          
+          // Read initial state
+          int currentState = lab.readCurrentState();
+          
+          // Episode loop
+          int steps = 0;
+          int maxSteps = 100; // Prevent infinite loops
+          
+          while (!goalStates.contains(currentState) && steps < maxSteps) {
+              // Get applicable actions for current state
+              List<Integer> applicableActions = lab.getApplicableActions(currentState);
+              
+              if (applicableActions.isEmpty()) {
+                  break; // No actions available
+              }
+              
+              // Epsilon-greedy action selection
+              int selectedAction;
+              if (random.nextDouble() < epsilon) {
+                  // Exploration: random action
+                  selectedAction = applicableActions.get(random.nextInt(applicableActions.size()));
+              } else {
+                  // Exploitation: best action based on Q-values
+                  selectedAction = applicableActions.get(0);
+                  double maxQ = qTable[currentState][selectedAction];
+                  
+                  for (int action : applicableActions) {
+                      if (qTable[currentState][action] > maxQ) {
+                          maxQ = qTable[currentState][action];
+                          selectedAction = action;
+                      }
+                  }
+              }
+              
+              // Perform action
+              lab.performAction(selectedAction);
+              
+              // Observe new state
+              int nextState = lab.readCurrentState();
+              
+              // Calculate reward
+              double immediateReward = 0;
+              if (goalStates.contains(nextState)) {
+                  immediateReward = reward; // Goal achieved
+              }
+              
+              // Find max Q-value for next state
+              List<Integer> nextActions = lab.getApplicableActions(nextState);
+              double maxNextQ = 0;
+              if (!nextActions.isEmpty()) {
+                  maxNextQ = qTable[nextState][nextActions.get(0)];
+                  for (int action : nextActions) {
+                      if (qTable[nextState][action] > maxNextQ) {
+                          maxNextQ = qTable[nextState][action];
+                      }
+                  }
+              }
+              
+              // Q-learning update rule: Q(s,a) = Q(s,a) + α[r + γ*max(Q(s',a')) - Q(s,a)]
+              double oldQ = qTable[currentState][selectedAction];
+              double newQ = oldQ + alpha * (immediateReward + gamma * maxNextQ - oldQ);
+              qTable[currentState][selectedAction] = newQ;
+              
+              // Move to next state
+              currentState = nextState;
+              steps++;
+          }
+          
+          // Log progress every 100 episodes
+          if ((episode + 1) % 100 == 0) {
+              LOGGER.info("Completed episode " + (episode + 1) + "/" + episodes);
+          }
+      }
+      
+      // Store the Q-table for this goal
+      qTables.put(goalKey.hashCode(), qTable);
+      
+      LOGGER.info("Q-learning completed for goal " + goalKey);
+      
+      // Optionally print the Q-table
+      if (episodes <= 1000) { // Only print for small runs
+          printQTable(qTable);
+      }
   }
 
 /**
