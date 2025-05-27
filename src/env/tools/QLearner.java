@@ -56,6 +56,29 @@ public class QLearner extends Artifact {
     * @param epsilonObj the exploration probability [0,1]
     * @param rewardObj the reward assigned when reaching the goal state
   **/
+  /**
+    * Computes a Q matrix for the state space and action space of the lab, and against
+    * a goal description. For example, the goal description can be of the form [z1level, z2Level],
+    * where z1Level is the desired value of the light level in Zone 1 of the lab,
+    * and z2Level is the desired value of the light level in Zone 2 of the lab.
+    * For exercise 11, the possible goal descriptions are:
+    * [0,0], [0,1], [0,2], [0,3], 
+    * [1,0], [1,1], [1,2], [1,3], 
+    * [2,0], [2,1], [2,2], [2,3], 
+    * [3,0], [3,1], [3,2], [3,3].
+    *
+    *<p>
+    * HINT: Use the methods of {@link LearningEnvironment} (implemented in {@link Lab})
+    * to interact with the learning environment (here, the lab), e.g., to retrieve the
+    * applicable actions, perform an action at the lab during learning etc.
+    *</p>
+    * @param  goalDescription  the desired goal against the which the Q matrix is calculated (e.g., [2,3])
+    * @param  episodesObj the number of episodes used for calculating the Q matrix
+    * @param  alphaObj the learning rate with range [0,1].
+    * @param  gammaObj the discount factor [0,1]
+    * @param epsilonObj the exploration probability [0,1]
+    * @param rewardObj the reward assigned when reaching the goal state
+  **/
   @OPERATION
   public void calculateQ(Object[] goalDescription, Object episodesObj, Object alphaObj, Object gammaObj, Object epsilonObj, Object rewardObj) {
       
